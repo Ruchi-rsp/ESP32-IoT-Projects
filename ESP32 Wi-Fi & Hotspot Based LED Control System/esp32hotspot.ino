@@ -1,23 +1,66 @@
 #include <WiFi.h>
+#include <WebServer.h>
 
-// Set your desired SSID and password
-const char* ssid = "ESP32_Hotspot";
-const char* password = "12345678";  // Must be at least 8 characters
+const int ledPin = 2; // Built-in LED
+
+// WiFi credentials
+const char* ssid = "YourWiFiName";
+const char* password = "YourPassword";
+
+// Access Point credentials
+const char* ap_ssid = "ESP32_LED";
+const char* ap_password = "12345678";
+
+WebServer server(80);
+
+void handleRoot() {
+  String html = "<h1>ESP32 LED Control</h1>";
+  html += "<a href=\"/on\"><button>ON</button></a>";
+  html += "<a href=\"/off\"><button>OFF</button></a>";
+  server.send(200, "text/html", html);
+}
+
+void handleOn() {
+  digitalWrite(ledPin, HIGH);
+  server.send(200, "text/html", "LED ON");
+}
+
+void handleOff() {
+  digitalWrite(ledPin, LOW);
+  server.send(200, "text/html", "LED OFF");
+}
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+  pinMode(ledPin, OUTPUT);
 
-  // Start Wi-Fi in Access Point mode
-  WiFi.softAP(ssid, password);
+  // Try connecting to WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
 
-  Serial.println("ESP32 started as Wi-Fi Hotspot");
-  Serial.print("Hotspot Name (SSID): ");
-  Serial.println(ssid);
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.softAPIP());
+  int count = 0;
+  while (WiFi.status() != WL_CONNECTED && count < 10) {
+    delay(1000);
+    Serial.print(".");
+    count++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nConnected to WiFi");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nSwitching to AP Mode");
+    WiFi.softAP(ap_ssid, ap_password);
+    Serial.println(WiFi.softAPIP());
+  }
+
+  server.on("/", handleRoot);
+  server.on("/on", handleOn);
+  server.on("/off", handleOff);
+
+  server.begin();
 }
 
 void loop() {
-  // Nothing to do here
+  server.handleClient();
 }
