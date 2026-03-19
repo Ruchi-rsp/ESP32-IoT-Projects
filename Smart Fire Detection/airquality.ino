@@ -1,14 +1,18 @@
+#define BLYNK_TEMPLATE_ID "YourTemplateID"
+#define BLYNK_TEMPLATE_NAME "Fire Detection System"
+#define BLYNK_AUTH_TOKEN "YourAuthToken"
 
-const int gasPin = 34; // A0 -> GPIO34 (ADC1_CH6)
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
 
-void setup() {
-  Serial.begin(115200);
-  delay(200);
-  analogReadResolution(12);                  
-  analogSetPinAttenuation(gasPin, ADC_11db); // ~0..3.3V input range
-}
+char ssid[] = "YourWiFiName";
+char pass[] = "YourWiFiPassword";
 
-uint16_t readAvg(int pin, int n = 32) {
+const int gasPin = 34;
+
+BlynkTimer timer;
+
+uint16_t readAvg(int pin, int n = 20) {
   uint32_t sum = 0;
   for (int i = 0; i < n; i++) {
     sum += analogRead(pin);
@@ -17,24 +21,38 @@ uint16_t readAvg(int pin, int n = 32) {
   return sum / n;
 }
 
-void loop() {
+void sendSensorData() {
   uint16_t raw = readAvg(gasPin);
   uint32_t mv = analogReadMilliVolts(gasPin);
 
-  Serial.print("RAW: "); Serial.print(raw);
-  Serial.print("  |  ");
-  Serial.print("Voltage: "); Serial.print(mv); Serial.println(" mV");
+  Serial.print("Gas Value: ");
+  Serial.println(raw);
 
- 
-  if (raw > 7) {
+  // Send to Blynk
+  Blynk.virtualWrite(V0, raw);
+
+  // Alert condition
+  if (raw > 1500) {
     Serial.println("Gas Detected!");
-  } 
-  else if (raw > 3) {
-    Serial.println("Slight Gas Presence!");
-  } 
-  else {
-    Serial.println("Air is Clean");
+    Blynk.logEvent("Gas Leakage Detected!");
+    Blynk.virtualWrite(V1, 1);
+  } else {
+    Blynk.virtualWrite(V1, 0);
   }
+}
 
-  delay(1000);
+void setup() {
+  Serial.begin(115200);
+
+  analogReadResolution(12);
+  analogSetPinAttenuation(gasPin, ADC_11db);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  timer.setInterval(1000L, sendSensorData);
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
 }
